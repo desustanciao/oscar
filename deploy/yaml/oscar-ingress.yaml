@@ -14,7 +14,7 @@ spec:
           path: /
           backend:
             service:
-              Name: oscar
-              Port: 
+              name: oscar
+              port: 
                 number: 8080
         

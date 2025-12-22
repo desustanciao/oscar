@@ -10,8 +10,8 @@ spec:
   rules:
     - http:
         paths:
-        - path: /
-          pathtype: Prefix
+        - pathType: Prefix
+          path: /
           backend:
             service:
               Name: oscar

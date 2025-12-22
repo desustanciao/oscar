@@ -15,5 +15,6 @@ spec:
           backend:
             service:
               Name: oscar
-              Port: 8080
+              Port: 
+                number: 8080
         

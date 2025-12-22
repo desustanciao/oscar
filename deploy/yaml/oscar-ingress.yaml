@@ -10,7 +10,10 @@ spec:
   rules:
     - http:
         paths:
-        - backend:
-            serviceName: oscar
-            servicePort: 8080
-          path: /
+        - path: /
+          pathtype: Prefix
+          backend:
+            service:
+              Name: oscar
+              Port: 8080
+        

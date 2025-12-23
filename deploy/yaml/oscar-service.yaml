@@ -3,10 +3,13 @@ kind: Service
 metadata:
   name: oscar
   namespace: oscar
+  labels:
+    app: oscar
+    monitoring: "true"
 spec:
   type: NodePort
   ports:
-    - name: endpoint
+    - name: http
       port: 8080
       protocol: TCP
       targetPort: 8080

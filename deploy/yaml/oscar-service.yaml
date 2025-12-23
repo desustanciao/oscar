@@ -4,9 +4,9 @@ metadata:
   name: oscar
   namespace: oscar
 spec:
+  type: NodePort
   ports:
     - name: endpoint
-      type: NodePort
       port: 8080
       protocol: TCP
       targetPort: 8080

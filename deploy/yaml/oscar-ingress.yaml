@@ -9,5 +9,5 @@ spec:
     service:
       name: oscar
       port:
-        number: 8080
+        number: 80
         

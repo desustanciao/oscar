@@ -7,14 +7,9 @@ metadata:
     #nginx.ingress.kubernetes.io/rewrite-target: /
     kubernetes.io/ingress.class: nginx
 spec:
-  rules:
-    - http:
-        paths:
-        - pathType: Prefix
-          path: /
-          backend:
-            service:
-              name: oscar
-              port: 
-                number: 8080
+  defaultBackend:
+    service:
+      name: oscar
+      port:
+        number: 8080
         

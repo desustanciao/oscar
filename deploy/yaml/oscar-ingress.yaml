@@ -5,9 +5,13 @@ metadata:
   name: oscar
 spec:
   ingressClassName: nginx
-  defaultBackend:
-    service:
-      name: oscar
-      port:
-        number: 80
-        
+rules:
+  -  http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: oscar
+            port:
+              number: 8080

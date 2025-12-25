@@ -3,10 +3,8 @@ kind: Ingress
 metadata:
   namespace: oscar
   name: oscar
-  annotations:
-    #nginx.ingress.kubernetes.io/rewrite-target: /
-    kubernetes.io/ingress.class: nginx
 spec:
+  ingressClassName: nginx
   defaultBackend:
     service:
       name: oscar

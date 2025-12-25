@@ -7,14 +7,10 @@ metadata:
     app: oscar
     monitoring: "true"
 spec:
-  type: NodePort
   ports:
-    - name: http
+    - name: endpoint
       port: 8080
       protocol: TCP
       targetPort: 8080
-      nodePort: 30302
-  internalTrafficPolicy: Cluster
-  externalTrafficPolicy: Cluster
   selector:
     app: oscar

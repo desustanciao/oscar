@@ -3,6 +3,8 @@ kind: Ingress
 metadata:
   namespace: oscar
   name: oscar
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
 spec:
   ingressClassName: nginx
   rules:

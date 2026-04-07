@@ -3,6 +3,8 @@ kind: Job
 metadata:
   name: populate-volume-job
   namespace: oscar-svc
+  annotations:
+    kustomize.toolkit.fluxcd.io/force: "true"
 spec:
   ttlSecondsAfterFinished: 120
   template:

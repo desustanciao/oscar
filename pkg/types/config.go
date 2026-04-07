@@ -45,6 +45,7 @@ const (
 	secondsType           = "seconds"
 	urlType               = "url"
 	serverlessBackendType = "serverlessBackend"
+	routeKindType         = "routeKind"
 )
 
 type configVar struct {
@@ -116,7 +117,7 @@ type Config struct {
 	OpenfaasScalerInterval string `json:"-"`
 
 	// OpenfaasScalerInactivityDuration
-	OpenfaasScalerInactivityDuration string `json:"-"`
+	OpenfaasScalerInactivityDuration string `json:"-"`*/
 
 	// WatchdogMaxInflight
 	WatchdogMaxInflight int `json:"-"`
@@ -131,7 +132,7 @@ type Config struct {
 	WatchdogReadTimeout int `json:"-"`
 
 	// WatchdogWriteTimeout
-	WatchdogWriteTimeout int `json:"-"`*/
+	WatchdogWriteTimeout int `json:"-"`
 
 	// WatchdogHealthCheckInterval
 	WatchdogHealthCheckInterval int `json:"-"`
@@ -154,9 +155,23 @@ type Config struct {
 	// YunikornConfigFileName
 	YunikornConfigFileName string `json:"-"`
 
+	// KueueEnable option to configure Kueue admission queues
+	KueueEnable bool `json:"kueue_enable"`
+
+	// KueueDefaultCPU default per-user ClusterQueue CPU quota
+	KueueDefaultCPU string `json:"-"`
+
+	// KueueDefaultMemory default per-user ClusterQueue memory quota
+	KueueDefaultMemory string `json:"-"`
+
+	// KueueDefaultFlavor default ResourceFlavor name used for ClusterQueues
+	KueueDefaultFlavor string `json:"-"`
+
 	// ResourceManagerEnable option to enable the Resource Manager to delegate jobs
 	// when there are no available resources in the cluster (if the service has replicas)
 	ResourceManagerEnable bool `json:"-"`
+
+	StorageClassName string `json:"-"`
 
 	// // ResourceManager parameter to set the ResourceManager to use ("kubernetes" or "yunikorn")
 	// // TODO: decide if this parameter is necessary or use kubernetes by default and yunikorn always if it's enabled
@@ -194,6 +209,15 @@ type Config struct {
 	//
 	IngressHost string `json:"-"`
 
+	// ExposedServicesRouteKind determines which Kubernetes resource is used to expose services (ingress|httproute)
+	ExposedServicesRouteKind string `json:"-"`
+
+	// HTTPRouteGatewayName Gateway name used as parentRef for generated HTTPRoutes
+	HTTPRouteGatewayName string `json:"-"`
+
+	// HTTPRouteGatewayNamespace optional Gateway namespace used as parentRef for generated HTTPRoutes
+	HTTPRouteGatewayNamespace string `json:"-"`
+
 	// Github path of FaaS Supervisor (needed for Interlink config)
 	SupervisorKitImage string `json:"-"`
 
@@ -214,6 +238,30 @@ type Config struct {
 
 	//Job listing limit
 	JobListingLimit int `json:"-"`
+
+	// PrometheusBaseURL base URL for Prometheus HTTP API
+	PrometheusBaseURL string `json:"-"`
+
+	// PrometheusCPUQuery query template for CPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	PrometheusCPUQuery string `json:"-"`
+
+	// PrometheusGPUQuery query template for GPU hours (use {{service}}, {{range}}, and {{services_namespace}})
+	PrometheusGPUQuery string `json:"-"`
+
+	// LokiBaseURL base URL for Loki HTTP API
+	LokiBaseURL string `json:"-"`
+
+	// LokiQuery query template for request logs (use {{namespace}}, {{app}})
+	LokiQuery string `json:"-"`
+
+	// LokiExposedQuery query template for exposed-service request logs (use {{namespace}}, {{app}})
+	LokiExposedQuery string `json:"-"`
+
+	// LokiExposedNamespace namespace label for exposed-service logs
+	LokiExposedNamespace string `json:"-"`
+
+	// LokiExposedAppLabel app label for exposed-service logs
+	LokiExposedAppLabel string `json:"-"`
 }
 
 var configVars = []configVar{
@@ -236,11 +284,11 @@ var configVars = []configVar{
 	//{"OpenfaasScalerEnable", "OPENFAAS_SCALER_ENABLE", false, boolType, "false"},
 	//{"OpenfaasScalerInterval", "OPENFAAS_SCALER_INTERVAL", false, stringType, "2m"},
 	//{"OpenfaasScalerInactivityDuration", "OPENFAAS_SCALER_INACTIVITY_DURATION", false, stringType, "10m"},
-	//{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
-	//{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
-	//{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
-	//{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
-	//{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
+	{"WatchdogMaxInflight", "WATCHDOG_MAX_INFLIGHT", false, intType, "1"},
+	{"WatchdogWriteDebug", "WATCHDOG_WRITE_DEBUG", false, boolType, "true"},
+	{"WatchdogExecTimeout", "WATCHDOG_EXEC_TIMEOUT", false, intType, "0"},
+	{"WatchdogReadTimeout", "WATCHDOG_READ_TIMEOUT", false, intType, "300"},
+	{"WatchdogWriteTimeout", "WATCHDOG_WRITE_TIMEOUT", false, intType, "300"},
 	{"WatchdogHealthCheckInterval", "WATCHDOG_HEALTHCHECK_INTERVAL", false, intType, "5"},
 	{"ReadTimeout", "READ_TIMEOUT", false, secondsType, "300"},
 	{"WriteTimeout", "WRITE_TIMEOUT", false, secondsType, "300"},
@@ -249,6 +297,11 @@ var configVars = []configVar{
 	{"YunikornNamespace", "YUNIKORN_NAMESPACE", false, stringType, "yunikorn"},
 	{"YunikornConfigMap", "YUNIKORN_CONFIGMAP", false, stringType, "yunikorn-configs"},
 	{"YunikornConfigFileName", "YUNIKORN_CONFIG_FILENAME", false, stringType, "queues.yaml"},
+	{"KueueEnable", "KUEUE_ENABLE", false, boolType, "true"},
+	{"KueueDefaultCPU", "KUEUE_DEFAULT_CPU", false, stringType, "2"},
+	{"KueueDefaultMemory", "KUEUE_DEFAULT_MEMORY", false, stringType, "2Gi"},
+	{"KueueDefaultFlavor", "KUEUE_DEFAULT_FLAVOR", false, stringType, "oscar-default-flavor"},
+	{"StorageClassName", "STORAGE_CLASS_NAME", false, stringType, "nfs"},
 	{"ResourceManagerEnable", "RESOURCE_MANAGER_ENABLE", false, boolType, "false"},
 	//{"ResourceManager", "RESOURCE_MANAGER", false, resourceManagerType, "kubernetes"},
 	{"ResourceManagerInterval", "RESOURCE_MANAGER_INTERVAL", false, intType, "15"},
@@ -261,6 +314,9 @@ var configVars = []configVar{
 	{"OIDCGroups", "OIDC_GROUPS", false, stringSliceType, ""},
 	{"UsersAdmin", "USERS_ADMIN", false, stringSliceType, ""},
 	{"IngressHost", "INGRESS_HOST", false, stringType, ""},
+	{"ExposedServicesRouteKind", "EXPOSED_SERVICES_ROUTE_KIND", false, routeKindType, "ingress"},
+	{"HTTPRouteGatewayName", "HTTPROUTE_GATEWAY_NAME", false, stringType, "traefik-gateway"},
+	{"HTTPRouteGatewayNamespace", "HTTPROUTE_GATEWAY_NAMESPACE", false, stringType, "traefik"},
 	{"SupervisorKitImage", "SUPERVISOR_KIT_IMAGE", false, stringType, ""},
 	{"IngressServicesCORSAllowedOrigins", "INGRESS_SERVICES_CORS_ALLOWED_ORIGINS", false, stringType, "https://dashboard.oscar.grycap.net,https://dashboard-devel.oscar.grycap.net,https://dashboard-demo.oscar.grycap.net,http://oscar.oscar.svc.cluster.local,http://host.docker.internal,http://localhost,http://localhost:5173"},
 	{"IngressServicesCORSAllowedMethods", "INGRESS_SERVICES_CORS_ALLOWED_METHODS", false, stringType, "GET, PUT, POST, DELETE, PATCH, HEAD"},
@@ -268,6 +324,14 @@ var configVars = []configVar{
 	{"AdditionalConfigPath", "ADDITIONAL_CONFIG_PATH", false, stringType, "config.yaml"},
 	{"TTLJob", "TTL_JOB", false, intType, "2592000"},
 	{"JobListingLimit", "JOB_LISTING_LIMIT", false, intType, "70"},
+	{"PrometheusBaseURL", "PROMETHEUS_URL", false, urlType, ""},
+	{"PrometheusCPUQuery", "PROMETHEUS_CPU_QUERY", false, stringType, "sum(increase(container_cpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"PrometheusGPUQuery", "PROMETHEUS_GPU_QUERY", false, stringType, "sum(increase(container_gpu_usage_seconds_total{namespace=~\"{{services_namespace}}.*\",service=~\"{{service}}\"}[{{range}}])) / 3600"},
+	{"LokiBaseURL", "LOKI_URL", false, urlType, ""},
+	{"LokiQuery", "LOKI_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/(job|run)/\""},
+	{"LokiExposedQuery", "LOKI_EXPOSED_QUERY", false, stringType, "{namespace=\"{{namespace}}\", app=\"{{app}}\"} |~ \"/system/services/.+/exposed\""},
+	{"LokiExposedNamespace", "LOKI_EXPOSED_NAMESPACE", false, stringType, "ingress-nginx"},
+	{"LokiExposedAppLabel", "LOKI_EXPOSED_APP", false, stringType, "ingress-nginx"},
 }
 
 func readConfigVar(cfgVar configVar) (string, error) {
@@ -360,6 +424,19 @@ func parseServerlessBackend(s string) (string, error) {
 	return s, nil
 }
 
+func parseRouteKind(s string) (string, error) {
+	if len(s) == 0 {
+		return "ingress", nil
+	}
+
+	str := strings.ToLower(strings.TrimSpace(s))
+	if str != "ingress" && str != "httproute" {
+		return "", fmt.Errorf("must be \"ingress\" or \"httproute\"")
+	}
+
+	return str, nil
+}
+
 // ReadConfig reads environment variables to create the OSCAR server configuration
 func ReadConfig() (*Config, error) {
 	config := &Config{}
@@ -387,6 +464,8 @@ func ReadConfig() (*Config, error) {
 			value, parseErr = parseSeconds(strValue)
 		case serverlessBackendType:
 			value, parseErr = parseServerlessBackend(strValue)
+		case routeKindType:
+			value, parseErr = parseRouteKind(strValue)
 		case urlType:
 			// Only check if can be parsed
 			_, parseErr = url.Parse(strValue)

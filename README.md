@@ -18,7 +18,7 @@ deployed on multi-Clouds, and even on low-powered devices, to create highly-para
 data-processing serverless applications along the computing continuum. These applications execute on customized runtime
 environments provided by Docker containers that run on elastic Kubernetes clusters.
 
-Information on how to deploy an OSCAR cluster using the Infrastucture Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
+Information on how to deploy an OSCAR cluster using the Infrastructure Manager can be found at: https://grycap.github.io/oscar/deploy-im-dashboard/
 
 For more documentation visit https://docs.oscar.grycap.net
 
@@ -35,7 +35,7 @@ For more documentation visit https://docs.oscar.grycap.net
 
 FaaS platforms are typically oriented to the execution of short-lived functions,
 coded in a certain programming language, in response to events. Scientific
-application can greatly benefit from this event-driven computing paradigm in
+applications can greatly benefit from this event-driven computing paradigm in
 order to trigger on demand the execution of a resource-intensive application
 that requires processing a certain file that was just uploaded to a storage
 service. This requires additional support for the execution of generic
@@ -79,7 +79,7 @@ The following components are deployed inside the Kubernetes cluster to support t
     container-based applications for synchronous invocations (default Serverless
     Backend).
 - [OSCAR Manager](https://docs.oscar.grycap.net/api/), the main API, responsible for the management of the services and the integration of the different components. 
-- [OSCAR UI](https://github.com/grycap/oscar-ui), an easy-to-use web-based graphical user interface aimed at end users.
+- [OSCAR Dashboard](https://github.com/grycap/oscar-dashboard), an easy-to-use web-based graphical user interface aimed at end users.
 
 
 As external storage providers, the following services can be used:
@@ -91,7 +91,7 @@ As external storage providers, the following services can be used:
     performance in the AWS public Cloud.
 - [Onedata](https://onedata.org/), the global data access solution for science,
     used in the [EGI Federated Cloud](https://datahub.egi.eu/).
-- [dCache](http://dcache.org//), a system for storing and retrieving huge amounts of data, distributed among a large number of heterogeneous server nodes, under a single virtual filesystem tree with a variety of standard access methods.
+- [dCache](https://dcache.org/), a system for storing and retrieving huge amounts of data, distributed among a large number of heterogeneous server nodes, under a single virtual filesystem tree with a variety of standard access methods.
 
 
 An OSCAR cluster can be easily deployed via the [IM Dashboard](http://im.egi.eu)
@@ -100,7 +100,7 @@ on any major public and on-premises Cloud provider, including the EGI Federated 
 ## Licensing
 
 OSCAR is licensed under the Apache License, Version 2.0. See
-[LICENSE](https://github.com/grycap/scar/blob/master/LICENSE) for the full
+[LICENSE](LICENSE) for the full
 license text.
 
 ## Acknowledgements
@@ -111,7 +111,7 @@ Partially funded by the projects:
 
 - [AI-SPRINT](https://ai-sprint-project.eu) "AI in Secure Privacy-Preserving Computing Continuum" that has received funding from the European Union’s Horizon 2020 Research and Innovation Programme under Grant 101016577.
 - [interTwin](https://intertwin.eu) "An interdisciplinary Digital Twin Engine for science" that has received funding from the European Union’s Horizon Europe Programme under Grant 101058386.
-- [AI4EOSC](https://ai4eosc.eu) "Artificial Intelligence for the European Open Science Cloud" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058593."
+- [AI4EOSC](https://ai4eosc.eu) "Artificial Intelligence for the European Open Science Cloud" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058593.
 - [iMagine](http://imagine-ai.eu) "AI-based image data analysis tools for aquatic research" that has received funding from the European Union’s Horizon Europe Research and Innovation Programme under Grant 101058625.
 
 Also, Grant PDC2021-120844-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033 and by “European Union NextGenerationEU/PRTR” and Grant PID2020-113126RB-I00 funded by Ministerio de Ciencia e Innovación/Agencia Estatal de Investigación/ 10.13039/501100011033.

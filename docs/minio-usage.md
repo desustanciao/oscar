@@ -22,7 +22,7 @@ Finally, the following image provides an overview of the MinIO login panel and t
 
 ![oscar-info](images/usage/minio/minio-ui.png)
 
-Further information about the MinIO Console avaliable on [MinIO Console documentation](https://min.io/docs/minio/linux/administration/minio-console.html).
+Further information about the MinIO Console is available in the [MinIO Console documentation](https://min.io/docs/minio/linux/administration/minio-console.html).
 
 ## Using command-line interfaces
 
@@ -36,7 +36,7 @@ MinIO buckets can also be managed through [oscar-cli command-line](https://githu
   An example of a put-file operation:
 
   ``` bash
-  oscar-cli service put-file fish-detector.yaml minio .path/to/your/images ./fish-detector/input/
+  oscar-cli service put-file fish-detector minio /path/to/your/images ./fish-detector/input/
   ```
   
 - **mc**: If a user wants to use the MinIO client it needs to follow some previous steps.

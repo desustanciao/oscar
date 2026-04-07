@@ -13,11 +13,11 @@ OSCAR supports the deployment and elasticity management of long-running stateles
 ![OSCAR Exposed Service](images/oscar-exposed-service.png)
 
 
- An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service pods are dynamically created (and removed when no longer necessary) within the user-defined boundaries. The user can also define the minimum and maximum replicas of the service to be present on the cluster (see the parameters `min_scale` and `max_scale` in [ExposeSettings](fdl.md/#exposesettings)).
+ An auto-scaled load-balanced approach for these stateless services is supported. When the average CPU exceeds a certain user-defined threshold, additional service pods are dynamically created (and removed when no longer necessary) within the user-defined boundaries. The user can also define the minimum and maximum replicas of the service to be present on the cluster (see the parameters `min_scale` and `max_scale` in [ExposeSettings](fdl.md#exposesettings)).
 
 
 ### Prerequisites in the container image
-The container image needs to have an HTTP server that binds to a specific port (see the parameter `port` in [ExposeSettings](fdl.md/#exposesettings)). If developing a service from scratch in Python, you can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In Go, you can use [Gin](https://gin-gonic.com/). For Ruby, you can use [Sinatra](https://sinatrarb.com/). 
+The container image needs to have an HTTP server that binds to a specific port (see the parameter `port` in [ExposeSettings](fdl.md#exposesettings)). If developing a service from scratch in Python, you can use [FastAPI](https://fastapi.tiangolo.com/) or [Flask](https://flask.palletsprojects.com/en/2.3.x/) to create an API. In Go, you can use [Gin](https://gin-gonic.com/). For Ruby, you can use [Sinatra](https://sinatrarb.com/). 
 
 
 > ⚠️
@@ -50,6 +50,7 @@ Additional options can be defined in the "expose" section of the FDL (some previ
 - `NodePort`: The access method from the domain name to the public ip `<cluster_ip>:<NodePort>`.
 - `default_command`: Selects between executing the container's default command and executing the script inside the container. (default: false, it executes the script)
 - `set_auth`: The credentials are composed of the service name as the user and the service token as the password. Turn off this field if the container provides its own authentication method. It does not work with `NodePort` (default: false, it has no authentication).
+- `health_path`: The path where the service readiness and liveness status are checked. Only if the root path `/` returns status 4XX or 5XX.
 
 
 Below is an example of the `expose` section of the FDL, showing that there will be between 5 to 15 active pods and that the service will expose an API in port 4578. The number of active pods will grow when the use of CPU increases by more than 50% and the active pods will decrease when the CPU use decreases below that threshold.
@@ -63,6 +64,7 @@ expose:
   set_auth: true
   rewrite_target: true
   default_command: true
+  health_path: "/"
 ```
 
 In addition, you can see below a full example of a recipe to expose a service from the [AI4EOSC Marketplace](https://dashboard.cloud.ai4eosc.eu/marketplace):

@@ -1,0 +1,25 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: populate-volume-job
+  namespace: oscar-svc
+spec:
+  ttlSecondsAfterFinished: 120
+  template:
+    spec:
+      containers:
+      - name: bin-downloader
+        image: "ghcr.io/grycap/oscar-bin-downloader:3.7.0"
+        env:
+        - name: FAAS_SUPERVISOR_VERSION
+          value: "1.6.2"
+        - name: WATCHDOG_VERSION
+          value: "0.2.1"
+        volumeMounts:
+        - name: oscar-vol
+          mountPath: /data
+      restartPolicy: Never
+      volumes:
+      - name: oscar-vol
+        persistentVolumeClaim:
+          claimName: oscar-pvc

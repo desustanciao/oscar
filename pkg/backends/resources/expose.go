@@ -45,12 +45,23 @@ const (
 	typeNodePort       = "NodePort"
 	typeClusterIP      = "ClusterIP"
 	prefixLabelApp     = "oscar-svc-exp-"
-	keyLabelApp        = "app"
+	KeyLabelApp        = "app"
 	podPortName        = "podport"
 	servicePortName    = "serviceport"
 	servicePortNumber  = 80
 	routeKindIngress   = "ingress"
 	routeKindHTTPRoute = "httproute"
+
+	livenessInitialDelaySeconds  = 60
+	livenessFailureThreshold     = 12
+	livenessPeriodSeconds        = 10
+	livenessTimeoutSeconds       = 10
+	readinessInitialDelaySeconds = 10
+	readinessPeriodSeconds       = 5
+	readinessTimeoutSeconds      = 10
+	startupFailureThreshold      = 18
+	startupPeriodSeconds         = 10
+	startupTimeoutSeconds        = 10
 )
 
 var httpRouteGVR = schema.GroupVersionResource{
@@ -126,7 +137,7 @@ func DeleteExpose(name string, namespace string, kubeClientset kubernetes.Interf
 		PropagationPolicy:  &foreground,
 	}
 	listOpts := metav1.ListOptions{
-		LabelSelector: "app=oscar-svc-exp-" + name,
+		LabelSelector: KeyLabelApp + "=" + GetKeyLabelApp(name),
 	}
 	err = kubeClientset.CoreV1().Pods(targetNamespace).DeleteCollection(context.TODO(), delete, listOpts)
 	if err != nil {
@@ -379,7 +390,7 @@ func createDeployment(service types.Service, namespace string, kubeClientset kub
 
 // Return the component deployment, ready to create or update
 func getDeploymentSpec(service types.Service, namespace string, cfg *types.Config) *apps.Deployment {
-	deployName := getDeploymentName(service.Name)
+	deployName := GetDeploymentName(service.Name)
 	minScale := int32(0)
 	if service.Owner == types.DefaultOwner || !cfg.KueueEnable {
 		minScale = int32(service.Expose.MinScale)
@@ -400,7 +411,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 			Replicas: &minScale,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
-					keyLabelApp: prefixLabelApp + service.Name,
+					KeyLabelApp: GetKeyLabelApp(service.Name),
 				},
 			},
 			Template: getPodTemplateSpec(service, namespace, cfg),
@@ -425,7 +436,7 @@ func getDeploymentSpec(service types.Service, namespace string, cfg *types.Confi
 // Return the component HorizontalAutoScale, ready to create or update
 func getHortizontalAutoScaleSpec(service types.Service, namespace string, cfg *types.Config) *autos.HorizontalPodAutoscaler {
 	hpaName := getHPAName(service.Name)
-	deployName := getDeploymentName(service.Name)
+	deployName := GetDeploymentName(service.Name)
 	hpa := &autos.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      hpaName,
@@ -478,16 +489,23 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 		}
 
 		podSpec.Containers[i].LivenessProbe = &v1.Probe{
-			InitialDelaySeconds: 30,
-			PeriodSeconds:       10,
+			FailureThreshold:    livenessFailureThreshold,
+			InitialDelaySeconds: livenessInitialDelaySeconds,
+			PeriodSeconds:       livenessPeriodSeconds,
 			ProbeHandler:        probeHandler,
-			TimeoutSeconds:      2,
+			TimeoutSeconds:      livenessTimeoutSeconds,
 		}
 		podSpec.Containers[i].ReadinessProbe = &v1.Probe{
-			InitialDelaySeconds: 10,
-			PeriodSeconds:       5,
+			InitialDelaySeconds: readinessInitialDelaySeconds,
+			PeriodSeconds:       readinessPeriodSeconds,
 			ProbeHandler:        probeHandler,
-			TimeoutSeconds:      2,
+			TimeoutSeconds:      readinessTimeoutSeconds,
+		}
+		podSpec.Containers[i].StartupProbe = &v1.Probe{
+			FailureThreshold: startupFailureThreshold,
+			PeriodSeconds:    startupPeriodSeconds,
+			ProbeHandler:     probeHandler,
+			TimeoutSeconds:   startupTimeoutSeconds,
 		}
 	}
 	var num int32 = 0777
@@ -500,7 +518,8 @@ func getPodTemplateSpec(service types.Service, namespace string, cfg *types.Conf
 			Name:      service.Name,
 			Namespace: namespace,
 			Labels: map[string]string{
-				keyLabelApp: prefixLabelApp + service.Name,
+				types.OscarUserServiceLabel: "true",
+				KeyLabelApp:                 GetKeyLabelApp(service.Name),
 			},
 		},
 		Spec: *podSpec,
@@ -529,7 +548,7 @@ func deleteDeployment(name string, namespace string, kubeClientset kubernetes.In
 	if err = ignoreNotFound(err); err != nil {
 		return err
 	}
-	deployment := getDeploymentName(name)
+	deployment := GetDeploymentName(name)
 	err = kubeClientset.AppsV1().Deployments(namespace).Delete(context.TODO(), deployment, metav1.DeleteOptions{})
 	if err = ignoreNotFound(err); err != nil {
 		return err
@@ -540,7 +559,7 @@ func deleteDeployment(name string, namespace string, kubeClientset kubernetes.In
 ///Update Deployment and HPA
 
 func updateDeployment(service types.Service, namespace string, kubeClientset kubernetes.Interface, cfg *types.Config) error {
-	_, err := kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), getDeploymentName(service.Name), metav1.GetOptions{})
+	_, err := kubeClientset.AppsV1().Deployments(namespace).Get(context.TODO(), GetDeploymentName(service.Name), metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
@@ -611,7 +630,7 @@ func getServiceSpec(service types.Service, namespace string, cfg *types.Config) 
 			Ports: []v1.ServicePort{port},
 			Type:  service_type,
 			Selector: map[string]string{
-				keyLabelApp: prefixLabelApp + service.Name,
+				KeyLabelApp: GetKeyLabelApp(service.Name),
 			},
 		},
 		Status: v1.ServiceStatus{},
@@ -939,6 +958,7 @@ func getIngressSpec(service types.Service, namespace string, cfg *types.Config) 
 		"nginx.ingress.kubernetes.io/cors-allow-origin":  cfg.IngressServicesCORSAllowedOrigins,
 		"nginx.ingress.kubernetes.io/cors-allow-methods": cfg.IngressServicesCORSAllowedMethods,
 		"nginx.ingress.kubernetes.io/cors-allow-headers": cfg.IngressServicesCORSAllowedHeaders,
+		"nginx.ingress.kubernetes.io/proxy-body-size":    "0",
 	}
 	if service.Expose.SetAuth {
 		annotation["nginx.ingress.kubernetes.io/auth-type"] = "basic"
@@ -1337,14 +1357,18 @@ func getProbePath(service types.Service) string {
 	return healthPath
 }
 
-func getDeploymentName(name_container string) string {
-	return name_container + "-dlp"
+func GetDeploymentName(nameContainer string) string {
+	return nameContainer + "-dpl"
 }
 
-func getHPAName(name_container string) string {
-	return name_container + "-hpa"
+func getHPAName(nameContainer string) string {
+	return nameContainer + "-hpa"
 }
 
-func getSecretName(name_container string) string {
-	return name_container + "-auth-expose"
+func getSecretName(nameContainer string) string {
+	return nameContainer + "-auth-expose"
+}
+
+func GetKeyLabelApp(serviceName string) string {
+	return prefixLabelApp + serviceName
 }

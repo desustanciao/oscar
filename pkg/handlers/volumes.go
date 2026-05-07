@@ -55,6 +55,7 @@ func MakeListVolumesHandler(cfg *types.Config, back types.ServerlessBackend) gin
 			c.String(http.StatusInternalServerError, err.Error())
 			return
 		}
+
 		c.JSON(http.StatusOK, volumes)
 	}
 }
@@ -90,6 +91,12 @@ func MakeCreateVolumeHandler(cfg *types.Config, back types.ServerlessBackend) gi
 		if err != nil {
 			c.String(http.StatusInternalServerError, err.Error())
 			return
+		}
+		if owner != types.DefaultOwner {
+			if err := utils.ValidateManagedVolumeQuota(auth.FormatUID(owner), namespace, req.Size, cfg, back.GetKubeClientset()); err != nil {
+				c.String(http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 
 		err = resources.CreateManagedVolume(

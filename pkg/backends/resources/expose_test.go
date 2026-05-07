@@ -66,6 +66,71 @@ func newExposeService(name string, nodePort int32, setAuth bool) types.Service {
 	return svc
 }
 
+func TestGetPodTemplateSpecProbeDefaults(t *testing.T) {
+	svc := newExposeService("svc", 0, false)
+	svc.Expose.HealthPath = "/healthz"
+	svc.Expose.ProbeMode = "direct"
+
+	template := getPodTemplateSpec(svc, "oscar-svc", newTestConfig())
+	container := template.Spec.Containers[0]
+
+	if container.LivenessProbe == nil {
+		t.Fatalf("expected liveness probe")
+	}
+	if container.ReadinessProbe == nil {
+		t.Fatalf("expected readiness probe")
+	}
+	if container.StartupProbe == nil {
+		t.Fatalf("expected startup probe")
+	}
+
+	liveness := container.LivenessProbe
+	if liveness.FailureThreshold != livenessFailureThreshold {
+		t.Fatalf("expected liveness failure threshold %d, got %d",
+			livenessFailureThreshold, liveness.FailureThreshold)
+	}
+	if liveness.InitialDelaySeconds != livenessInitialDelaySeconds {
+		t.Fatalf("expected liveness initial delay %d, got %d",
+			livenessInitialDelaySeconds, liveness.InitialDelaySeconds)
+	}
+	if liveness.PeriodSeconds != livenessPeriodSeconds {
+		t.Fatalf("expected liveness period %d, got %d",
+			livenessPeriodSeconds, liveness.PeriodSeconds)
+	}
+	if liveness.TimeoutSeconds != livenessTimeoutSeconds {
+		t.Fatalf("expected liveness timeout %d, got %d",
+			livenessTimeoutSeconds, liveness.TimeoutSeconds)
+	}
+
+	readiness := container.ReadinessProbe
+	if readiness.InitialDelaySeconds != readinessInitialDelaySeconds {
+		t.Fatalf("expected readiness initial delay %d, got %d",
+			readinessInitialDelaySeconds, readiness.InitialDelaySeconds)
+	}
+	if readiness.PeriodSeconds != readinessPeriodSeconds {
+		t.Fatalf("expected readiness period %d, got %d",
+			readinessPeriodSeconds, readiness.PeriodSeconds)
+	}
+	if readiness.TimeoutSeconds != readinessTimeoutSeconds {
+		t.Fatalf("expected readiness timeout %d, got %d",
+			readinessTimeoutSeconds, readiness.TimeoutSeconds)
+	}
+
+	startup := container.StartupProbe
+	if startup.FailureThreshold != startupFailureThreshold {
+		t.Fatalf("expected startup failure threshold %d, got %d",
+			startupFailureThreshold, startup.FailureThreshold)
+	}
+	if startup.PeriodSeconds != startupPeriodSeconds {
+		t.Fatalf("expected startup period %d, got %d",
+			startupPeriodSeconds, startup.PeriodSeconds)
+	}
+	if startup.TimeoutSeconds != startupTimeoutSeconds {
+		t.Fatalf("expected startup timeout %d, got %d",
+			startupTimeoutSeconds, startup.TimeoutSeconds)
+	}
+}
+
 func useFakeGatewayClient(t *testing.T) {
 	t.Helper()
 
@@ -93,8 +158,18 @@ func TestCreateExposeWithIngressAndAuth(t *testing.T) {
 		t.Fatalf("CreateExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{}); err != nil {
 		t.Fatalf("expected deployment to exist: %v", err)
+	}
+	deployment, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("expected deployment to exist: %v", err)
+	}
+	if deployment.Spec.Template.Spec.EnableServiceLinks == nil {
+		t.Fatal("expected deployment pod spec to set EnableServiceLinks")
+	}
+	if *deployment.Spec.Template.Spec.EnableServiceLinks {
+		t.Fatal("expected deployment pod spec to disable service links")
 	}
 
 	if _, err := client.AutoscalingV1().HorizontalPodAutoscalers(svc.Namespace).Get(context.TODO(), getHPAName(svc.Name), metav1.GetOptions{}); err != nil {
@@ -284,7 +359,7 @@ func TestDeleteExposeRemovesResources(t *testing.T) {
 		t.Fatalf("DeleteExpose returned error: %v", err)
 	}
 
-	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), getDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
+	if _, err := client.AppsV1().Deployments(svc.Namespace).Get(context.TODO(), GetDeploymentName(svc.Name), metav1.GetOptions{}); err == nil {
 		t.Fatalf("expected deployment to be removed")
 	}
 

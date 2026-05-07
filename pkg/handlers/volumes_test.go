@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/grycap/oscar/v3/pkg/types"
 	"github.com/grycap/oscar/v3/pkg/utils"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -44,6 +46,7 @@ func TestVolumeHandlersCRUD(t *testing.T) {
 	listResp := httptest.NewRecorder()
 	r.ServeHTTP(listResp, listReq)
 	if listResp.Code != http.StatusOK {
+		fmt.Println(listResp.Body)
 		t.Fatalf("expected list volume status 200, got %d", listResp.Code)
 	}
 	if !strings.Contains(listResp.Body.String(), "shared-data") {
@@ -64,6 +67,32 @@ func TestVolumeHandlersCRUD(t *testing.T) {
 	r.ServeHTTP(deleteResp, deleteReq)
 	if deleteResp.Code != http.StatusNoContent {
 		t.Fatalf("expected delete volume status 204, got %d: %s", deleteResp.Code, deleteResp.Body.String())
+	}
+}
+
+func TestCreateVolumeHandlerRejectsQuotaExceeded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	back := backends.MakeFakeBackend()
+	cfg := &types.Config{ServicesNamespace: "oscar-svc"}
+	createBaseRuntimePVC(t, back, cfg)
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("uidOrigin", "user@example.org")
+		c.Next()
+	})
+	r.POST("/system/volumes", MakeCreateVolumeHandler(cfg, back))
+
+	req := httptest.NewRequest(http.MethodPost, "/system/volumes", strings.NewReader(`{"name":"too-large","size":"2Gi"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer token")
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, req)
+	if resp.Code != http.StatusBadRequest {
+		t.Fatalf("expected create volume status 400, got %d: %s", resp.Code, resp.Body.String())
+	}
+	if !strings.Contains(resp.Body.String(), "not enough volume disk quota") {
+		t.Fatalf("expected volume quota error, got %s", resp.Body.String())
 	}
 }
 
@@ -114,6 +143,10 @@ func TestDeleteVolumeHandlerRejectsAttachedVolume(t *testing.T) {
 
 func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.Config) {
 	t.Helper()
+	namespace := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = back.GetKubeClientset().CoreV1().Namespaces().Create(t.Context(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{Name: namespace},
+	}, metav1.CreateOptions{})
 	_, _ = back.GetKubeClientset().CoreV1().PersistentVolumes().Create(t.Context(), &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "base-oscar-pv",
@@ -129,6 +162,38 @@ func createBaseRuntimePVC(t *testing.T, back *backends.FakeBackend, cfg *types.C
 		},
 		Status: v1.PersistentVolumeClaimStatus{
 			Phase: v1.ClaimBound,
+		},
+	}, metav1.CreateOptions{})
+	userNS := utils.BuildUserNamespace(cfg, "user@example.org")
+	_, _ = back.GetKubeClientset().CoreV1().ResourceQuotas(userNS).Create(t.Context(), &v1.ResourceQuota{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "user",
+			Namespace: userNS,
+		},
+		Spec: v1.ResourceQuotaSpec{
+			Hard: v1.ResourceList{
+				v1.ResourceRequestsStorage:        resource.MustParse("1Gi"),
+				v1.ResourcePersistentVolumeClaims: resource.MustParse("2"),
+			},
+		},
+	}, metav1.CreateOptions{})
+	_, _ = back.GetKubeClientset().CoreV1().LimitRanges(userNS).Create(t.Context(), &v1.LimitRange{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "user",
+			Namespace: userNS,
+		},
+		Spec: v1.LimitRangeSpec{
+			Limits: []v1.LimitRangeItem{
+				{
+					Type: "PersistentVolumeClaim",
+					Max: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("1Gi"),
+					},
+					Min: v1.ResourceList{
+						v1.ResourceStorage: resource.MustParse("200Mi"),
+					},
+				},
+			},
 		},
 	}, metav1.CreateOptions{})
 }

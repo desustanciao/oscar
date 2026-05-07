@@ -806,7 +806,7 @@ func TestKnativeGetProxyDirector(t *testing.T) {
 
 	back := MakeKnativeBackend(clientset, fakeConfig, testConfig)
 
-	proxyDirector := back.GetProxyDirector("testService")
+	proxyDirector := back.GetProxyDirector("testService", testConfig.ServicesNamespace)
 
 	testReq, _ := http.NewRequest(http.MethodPost, "testurl", nil)
 
@@ -826,5 +826,24 @@ func TestKnativeKubeGetKubeClientset(t *testing.T) {
 
 	if clientset != back.GetKubeClientset() {
 		t.Error("the clientset obtained is not the same")
+	}
+}
+
+func TestKnativeGetRuntimeService(t *testing.T) {
+	clientset := fake.NewSimpleClientset()
+	back := MakeKnativeBackend(clientset, fakeConfig, testConfig)
+	back.knClientset = knFake.NewSimpleClientset(&knv1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "svc",
+			Namespace: "ns",
+		},
+	})
+
+	svc, err := back.GetRuntimeService("ns", "svc")
+	if err != nil {
+		t.Fatalf("get runtime service: %v", err)
+	}
+	if svc.Name != "svc" {
+		t.Fatalf("expected knative service svc, got %s", svc.Name)
 	}
 }

@@ -13,6 +13,12 @@ is in charge of:
 - Upload the content of the output folder accessible via the `TMP_OUTPUT_DIR`
     environment variable.
 
+In addition to the runtime variables managed by the FaaS Supervisor, OSCAR also
+injects service metadata variables in every container, such as
+`OSCAR_SERVICE_NAME`, `OSCAR_SERVICE_TOKEN` and `OSCAR_SERVICE_BASE_PATH`.
+Their canonical definition is documented in the [FDL environment
+variables section](fdl.md#envvarsmap).
+
 
 
 ### FaaS Supervisor
@@ -54,7 +60,6 @@ You can follow one of the
 in order to test the OSCAR framework for specific applications. We recommend
 you to start with the
 [plant classification example](https://github.com/grycap/oscar/tree/master/examples/plant-classification-sync).
-
 
 ### External Storage Providers
 

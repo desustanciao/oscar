@@ -118,8 +118,7 @@ storage_providers:
 | `delegation` </br> *string*                                       | Mode of job delegation for replicas. Optional. Values: `static` (default), `random`, `load-based`, `topsis`.                                                                                                                    |
 | `synchronous` </br> *[SynchronousSettings](#synchronoussettings)* | Struct to configure specific sync parameters. These settings are only applied on Knative ServerlessBackend. Optional.                                                                                                                                         |
 | `expose` </br> *[ExposeSettings](#exposesettings)* | Allows to expose the API or UI of the application run in the OSCAR service outside of the Kubernetes cluster. Optional.                                                                                                                                         |
-| `replicas` </br> *[Replica](#replica) array*                      | List of replicas to delegate jobs. Optional.                                                                                                                                                                                                                 |
-| `rescheduler_threshold` </br> *integer*                            | Time (in seconds) that a job (with replicas) can be queued before delegating it. Optional.                                                                                                                                                                   |
+| `federation` </br> *[Federation](#federation)*                     | Federation configuration (topology, members, delegation, rescheduler threshold). Optional.                                                                                                                                                                  |
 | `log_level` </br> *string*                                        | Log level for the [faas-supervisor](https://github.com/grycap/faas-supervisor). Available levels: NOTSET, DEBUG, INFO, WARNING, ERROR and CRITICAL. Optional (default: INFO)                                                                                                                              |
 | `input` </br> *[StorageIOConfig](#storageioconfig) array*         | Array with the input configuration for the service. Optional                                                                                                                                                                                                 |
 | `output` </br> *[StorageIOConfig](#storageioconfig) array*        | Array with the output configuration for the service. Optional                                                                                                                                                                                                |
@@ -139,6 +138,16 @@ storage_providers:
 | `min_scale` </br> *integer* | Minimum number of active replicas (pods) for the service. Optional. (default: 0)             |
 | `max_scale` </br> *integer* | Maximum number of active replicas (pods) for the service. Optional. (default: 0 (Unlimited)) |
 
+## Federation
+
+| Field                        | Description                                 |
+|------------------------------| --------------------------------------------|
+| `group_id` </br> *string*                                       | Identifier for the federation group. Optional (default: service name). |
+| `topology` </br> *string*                                       | Federation topology: `none`, `star`, `mesh`. Optional. |
+| `delegation` </br> *string*                                     | Mode of job delegation for federation members. Optional. Values: `static` (default), `random`, `load-based`, `topsis`. |
+| `rescheduler_threshold` </br> *integer*                         | Time (in seconds) that a job (with members) can be queued before delegating it. Optional. |
+| `members` </br> *[Replica](#replica) array*                    | List of federation members to delegate jobs. Optional. |
+
 ## ExposeSettings
 
 | Field                        | Description                                 |
@@ -149,7 +158,7 @@ storage_providers:
 | `cpu_threshold` </br> *integer* | Percent of use of CPU before creating other pod (default: 80 max:100). Optional.  |
 | `nodePort` </br> *integer* | Change the access method from the domain name to the public ip. Optional.   |
 | `set_auth` </br> *bool* | Create credentials for the service, composed of the service name as the user and the service token as the password. (default: false). Optional.  |
-| `rewrite_target` </br> *bool* | Target the URI where the traffic is redirected. (default: false). Optional.  |
+| `rewrite_target` </br> *bool* | It is an expose boolean in the FDL that controls how OSCAR configures the NGINX Ingress/HTTProute rewrite for exposed services. If rewrite_target: false, ingress rewrites to /$1. If rewrite_target: true, ingress rewrites to /system/services/<service>/exposed/$1 (default: false). Optional.  |
 | `default_command` </br> *bool* | Select between executing the container's default command and executing the script inside the container. (default: false). Optional.  |
 | `health_path` </br> *string* | Change the service readiness and liveness check path/endpoint. (default: "/"). Optional.  |
 | `probe_mode` </br> *string* | Probe path mode for exposed-service pod health checks. `legacy` (default) keeps current behavior; `direct` probes only `health_path` on the container without the OSCAR ingress prefix. Optional. |
@@ -196,6 +205,8 @@ storage_providers:
 |`variables` </br> *map[string]string* | Map to define the environment variables that will be available in the service container |
 |`secrets` </br> *map[string]string* | Map to define the secret environment variables that will be available in the service container |
 
+> ℹ️ For federated services, `secrets.refresh_token` is required. OSCAR Manager
+> stores this value in the user namespace and does not mount it into service pods.
 OSCAR also injects a small set of reserved environment variables in every service container:
 
 | Variable | Description |

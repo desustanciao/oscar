@@ -193,6 +193,11 @@ type Service struct {
 	// Optional. (default: "")
 	TotalCPU string `json:"total_cpu"`
 
+	// EphemeralStorageRequest request size for ephemeral storage following the kubernetes format
+	// https://kubernetes.io/docs/concepts/configuration/manage-compute-resources-container/#meaning-of-ephemeral-storage
+	// Optional. (default: "")
+	EphemeralStorageRequest string `json:"ephemeral_storage_request"`
+
 	// EnableGPU parameter to request gpu usage in service's executions (synchronous and asynchronous)
 	// Optional. (default: false)
 	EnableGPU bool `json:"enable_gpu"`
@@ -482,6 +487,7 @@ type Expose struct {
 	NodePort       []int32 `json:"nodePort,omitempty" `
 	DefaultCommand bool    `json:"default_command" `
 	SetAuth        bool    `json:"set_auth" `
+	AuthType       string  `json:"auth_type,omitempty" default:"basic" `
 	HealthPath     string  `json:"health_path" default:"/" `
 	ProbeMode      string  `json:"probe_mode,omitempty" default:"legacy" `
 }
@@ -639,7 +645,8 @@ func SetSecurityContext(podSpec *v1.PodSpec) {
 
 func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 	resources := v1.ResourceRequirements{
-		Limits: v1.ResourceList{},
+		Limits:   v1.ResourceList{},
+		Requests: v1.ResourceList{},
 	}
 
 	if len(service.CPU) > 0 {
@@ -656,6 +663,15 @@ func CreateResources(service *Service) (v1.ResourceRequirements, error) {
 			return resources, err
 		}
 		resources.Limits[v1.ResourceMemory] = memory
+	}
+
+	// Include ephemeral storage request so Kueue can enforce per-user quotas.
+	if len(service.EphemeralStorageRequest) > 0 {
+		ephemeral, err := resource.ParseQuantity(service.EphemeralStorageRequest)
+		if err != nil {
+			return resources, err
+		}
+		resources.Requests[v1.ResourceEphemeralStorage] = ephemeral
 	}
 
 	if service.EnableGPU {

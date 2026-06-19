@@ -29,6 +29,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/gin-gonic/gin"
 	"github.com/grycap/cdmi-client-go"
+	"github.com/grycap/oscar/v4/pkg/backends/resources"
 	"github.com/grycap/oscar/v4/pkg/types"
 	"github.com/grycap/oscar/v4/pkg/utils"
 	"github.com/grycap/oscar/v4/pkg/utils/auth"
@@ -301,6 +302,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 			}
 		}
 
+		// Check if a service with the same name already exists in the cluster
+		if exists, err := serviceWithSameNameExists(service.Name, back); err != nil {
+			c.String(http.StatusInternalServerError, fmt.Sprintf("Error checking for existing service: %v", err))
+			return
+		} else if exists {
+			c.String(http.StatusBadRequest, "A service with the provided name already exists")
+			return
+		}
+
 		// Create service
 		if err := back.CreateService(service); err != nil {
 			// Check if error is caused because the service name provided already exists
@@ -310,8 +320,16 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 				} else {
 					c.String(http.StatusConflict, "A service with the provided name already exists")
 				}
-			} else if k8sErrors.IsNotFound(err) && service.Volume != nil && !service.CreatesManagedVolume() {
-				c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
+			} else if k8sErrors.IsNotFound(err) && service.Volume != nil {
+				if service.CreatesManagedVolume() {
+					errDelete := back.DeleteService(service)
+					if errDelete != nil {
+						log.Printf("Error deleting service: %v\n", errDelete)
+					}
+					c.String(http.StatusBadRequest, "Referenced volume size is not defined: Please add the volume size in service definition")
+				} else {
+					c.String(http.StatusBadRequest, "Referenced volume does not exist in the caller namespace")
+				}
 			} else {
 				errDelete := back.DeleteService(service)
 				if errDelete != nil {
@@ -379,15 +397,15 @@ func MakeCreateHandler(cfg *types.Config, back types.ServerlessBackend) gin.Hand
 					}
 				}
 
+				oldTags, _ := minIOAdminClient.GetTaggedMetadata(b.BucketName)
 				// Bucket metadata for filtering
-				tags := map[string]string{
-					"owner":        uid,
-					"from_service": service.Name,
-					"owner_name":   ownerName,
-				}
-				if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
-					c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
-					return
+				// If bucket dont have already the tags, set them.
+				if oldTags == nil || len(oldTags) == 0 {
+					tags := getBucketTags(&service, uid, ownerName, b.BucketName)
+					if err := minIOAdminClient.SetTags(b.BucketName, tags); err != nil {
+						c.String(http.StatusBadRequest, fmt.Sprintf("Error tagging bucket: %v", err))
+						return
+					}
 				}
 				if minIOQuota != nil && minIOQuota.StoragePerBucket != "" {
 					if err := minIOAdminClient.SetBucketStorageQuota(b.BucketName, minIOQuota.StoragePerBucket); err != nil {
@@ -759,6 +777,9 @@ func createBuckets(service *types.Service, cfg *types.Config, minIOAdminClient *
 	}
 
 	if service.Mount.Provider != "" {
+		if resources.ValidateMountOpts(service.Mount.Options) == "" && service.Mount.Options != "" {
+			return nil, fmt.Errorf("mount options contain invalid characters")
+		}
 		provID, provName = getProviderInfo(service.Mount.Provider)
 		if provName == types.MinIOName {
 			// Check if the provider identifier is defined in StorageProviders
@@ -977,4 +998,27 @@ func registerMinIOWebhook(name string, token string, minIO *types.MinIOProvider,
 	}
 
 	return minIOAdminClient.RestartServer()
+}
+
+func serviceWithSameNameExists(name string, back types.ServerlessBackend) (bool, error) {
+	services, err := back.ListServicesByName(name)
+	if err != nil {
+		// Check if error is caused because the service is not found
+		if k8sErrors.IsNotFound(err) || k8sErrors.IsGone(err) {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	return len(services) > 0, nil
+}
+
+func getBucketTags(service *types.Service, uid, ownerName, bucketName string) map[string]string {
+	tags := map[string]string{
+		"owner":        uid,
+		"from_service": service.Name,
+		"owner_name":   ownerName,
+	}
+
+	return tags
 }

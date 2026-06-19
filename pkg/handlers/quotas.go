@@ -145,8 +145,9 @@ func MakeUpdateUserQuotaHandler(qb types.QuotaBackend, cfg *types.Config) gin.Ha
 			c.String(http.StatusBadRequest, fmt.Sprintf("invalid payload: %v", err))
 			return
 		}
-		if req.CPU == "" && req.Memory == "" && !hasVolumeQuotaUpdate(req.Volumes) && !hasMinIOQuotaUpdate(req.MinIO) {
-			c.String(http.StatusBadRequest, "cpu, memory, volumes or minio must be provided")
+		// Require at least one quota field to be set.
+		if req.CPU == "" && req.Memory == "" && req.EphemeralStorage == "" && !hasVolumeQuotaUpdate(req.Volumes) && !hasMinIOQuotaUpdate(req.MinIO) {
+			c.String(http.StatusBadRequest, "cpu, memory, ephemeral_storage, volumes or minio must be provided")
 			return
 		}
 		if err := ensureQuotasEnabled(cfg); err != nil {
@@ -212,6 +213,7 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 
 		var maxCPU int64
 		var maxMem int64
+		var maxGPU int64
 		if len(cq.Spec.ResourceGroups) > 0 && len(cq.Spec.ResourceGroups[0].Flavors) > 0 {
 			for _, res := range cq.Spec.ResourceGroups[0].Flavors[0].Resources {
 				switch res.Name {
@@ -219,12 +221,15 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 					maxCPU = res.NominalQuota.MilliValue()
 				case corev1.ResourceMemory:
 					maxMem = res.NominalQuota.Value()
+				case corev1.ResourceName("nvidia.com/gpu"):
+					maxGPU = res.NominalQuota.Value()
 				}
 			}
 		}
 
 		var usedCPU int64
 		var usedMem int64
+		var usedGPU int64
 		if len(cq.Status.FlavorsUsage) > 0 {
 			for _, res := range cq.Status.FlavorsUsage[0].Resources {
 				switch res.Name {
@@ -232,12 +237,39 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 					usedCPU = res.Total.MilliValue()
 				case corev1.ResourceMemory:
 					usedMem = res.Total.Value()
+				case corev1.ResourceName("nvidia.com/gpu"):
+					usedGPU = res.Total.Value()
+				}
+			}
+		}
+
+		// Read ephemeral storage nominal quota from ClusterQueue.
+		var maxEphemeral int64
+		if len(cq.Spec.ResourceGroups) > 0 && len(cq.Spec.ResourceGroups[0].Flavors) > 0 {
+			for _, res := range cq.Spec.ResourceGroups[0].Flavors[0].Resources {
+				switch res.Name {
+				case corev1.ResourceEphemeralStorage:
+					maxEphemeral = res.NominalQuota.Value()
+				}
+			}
+		}
+
+		// Read ephemeral storage usage from ClusterQueue status.
+		var usedEphemeral int64
+		if len(cq.Status.FlavorsUsage) > 0 {
+			for _, res := range cq.Status.FlavorsUsage[0].Resources {
+				switch res.Name {
+				case corev1.ResourceEphemeralStorage:
+					usedEphemeral = res.Total.Value()
 				}
 			}
 		}
 
 		resp.Resources["cpu"] = types.QuotaValues{Max: maxCPU, Used: usedCPU}
 		resp.Resources["memory"] = types.QuotaValues{Max: maxMem, Used: usedMem}
+		// Expose ephemeral storage quota and usage in the API response.
+		resp.Resources["ephemeral-storage"] = types.QuotaValues{Max: maxEphemeral, Used: usedEphemeral}
+		resp.Resources["gpu"] = types.QuotaValues{Max: maxGPU, Used: usedGPU}
 	}
 
 	if cfg.VolumeEnable {
@@ -263,7 +295,7 @@ func fetchQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, u
 }
 
 func updateQuota(ctx context.Context, cfg *types.Config, qb types.QuotaBackend, user string, req types.QuotaUpdateRequest) error {
-	if req.CPU != "" || req.Memory != "" {
+	if req.CPU != "" || req.Memory != "" || req.EphemeralStorage != "" {
 		if err := ensureKueueQuotasEnabled(cfg); err != nil {
 			return err
 		}
@@ -331,6 +363,23 @@ func updateKueueQuota(ctx context.Context, qb types.QuotaBackend, user string, r
 				q, err := resource.ParseQuantity(req.Memory)
 				if err != nil {
 					return fmt.Errorf("invalid memory quantity: %w", err)
+				}
+				flavor.Resources[i].NominalQuota = q
+			}
+		// Update ephemeral storage quota if provided in the request.
+		case corev1.ResourceEphemeralStorage:
+			if req.EphemeralStorage != "" {
+				q, err := resource.ParseQuantity(req.EphemeralStorage)
+				if err != nil {
+					return fmt.Errorf("invalid ephemeral storage quantity: %w", err)
+				}
+				flavor.Resources[i].NominalQuota = q
+			}
+		case corev1.ResourceName("nvidia.com/gpu"):
+			if req.GPU != "" {
+				q, err := resource.ParseQuantity(req.GPU)
+				if err != nil {
+					return fmt.Errorf("invalid gpu quantity: %w", err)
 				}
 				flavor.Resources[i].NominalQuota = q
 			}
